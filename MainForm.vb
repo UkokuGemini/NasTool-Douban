@@ -27,9 +27,10 @@ Public Class MainForm
     Dim Config_DB_Path As String = Directory.GetCurrentDirectory & "\config\user.db"
     Dim Config_DoubanID As String
     Dim Config_TMDB_API As String
+    Dim Config_Douban_SynDays As Integer
+    Dim Douban_Deadline As Date
     Dim DownLoad_Arr, Rss_Arr, RssID_Arr As New ArrayList
     Dim NewMovieAddArr As New ArrayList
-
     Dim GoGetThread As Thread
     Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         Me.Text = My.Application.Info.AssemblyName & "[" & My.Application.Info.Version.ToString & "]"
@@ -39,7 +40,6 @@ Public Class MainForm
         ReadSettingXml()
         DataBaseConnection.ConnectionString = "Data Source=" & Config_DB_Path
         ReadDB(Config_DB_Path)
-        GoGetThread = New Thread(AddressOf GoGet)
     End Sub
     Private Sub MainForm_FormClosing(sender As Object, e As FormClosingEventArgs) Handles MyBase.FormClosing
         Try
@@ -47,6 +47,42 @@ Public Class MainForm
             System.Environment.Exit(0)
         Catch ex As Exception
         End Try
+    End Sub
+    Private Sub ToolStripLabel1_Click(sender As Object, e As EventArgs) Handles ToolStripLabel1.Click
+        GoGetThread = New Thread(AddressOf GoGet)
+        GoGetThread.Start()
+    End Sub
+    Private Sub ToolStripLabel2_Click(sender As Object, e As EventArgs) Handles ToolStripLabel2.Click
+        ToolStripLabel2.Enabled = False
+        If NewMovieAddArr.Count > 0 Then
+            Dim FailNum As Integer = 0
+            For i = 0 To NewMovieAddArr.Count - 1
+                Dim Temp_Out As OutputInfos = NewMovieAddArr(i)
+                Dim sqlcommandStr As String = "INSERT INTO RSS_MOVIES VALUES(" &
+                    GetMinId() & ",'" &
+                  Temp_Out.NAME & "','" &
+                  Temp_Out.YEAR & "','','" &
+                  Temp_Out.TMDBID & "','" &
+                  Temp_Out.IMAGE & "','[]','[]',0,'','','','','','','',0,'S','','" &
+                  Temp_Out.NOTE & "')"
+                Try
+                    SQLDataBaseQeury(sqlcommandStr, DataBaseConnection)
+                    If ResRQeury = "" Then
+                    Else
+                        RichTextBox_Log.AppendText("⛔添加订阅错误" & ResRQeury.ToString & vbCrLf)
+                        FailNum += 1
+                    End If
+                Catch ex As Exception
+                    FailNum += 1
+                End Try
+            Next
+            ToolStripStatusLabel1.Text = "添加订阅完成:总计:" & NewMovieAddArr.Count & "[成功" & NewMovieAddArr.Count - FailNum & "/失败:" & FailNum & "]"
+            RichTextBox_Log.AppendText(vbCrLf & ToolStripStatusLabel1.Text & vbCrLf)
+            ReadDB(Config_DB_Path)
+            NewMovieAddArr.Clear()
+        Else
+            ToolStripStatusLabel1.Text = "没有要添加订阅的项目."
+        End If
     End Sub
 #Region "获取网页源码"
     Function GetWebCode(ByVal strURL As String) As String
@@ -174,6 +210,7 @@ Public Class MainForm
     End Function '数据库操作指令
 #End Region
     Sub ReadSettingXml()
+        RichTextBox_Log.AppendText(Format(Now, "yyyy/MM/dd HH:mm:ss") & vbCrLf & "💠配置:" & vbCrLf)
         Dim SettingPath As String = Directory.GetCurrentDirectory & "\NasTool-Douban_Setting.Xml"
         Try
             Dim SettingXml As String = ""
@@ -192,26 +229,39 @@ Public Class MainForm
                 RichTextBox_Log.AppendText("#Config_DoubanID:" & Config_DoubanID & vbCrLf)
                 Config_TMDB_API = CType(xmlDoc.SelectSingleNode("NasTool-Douban_Setting").SelectSingleNode("TMDB_API"), XmlElement).InnerText
                 RichTextBox_Log.AppendText("#Config_TMDB_API:" & Config_TMDB_API & vbCrLf)
+                Dim DayStr As String = CType(xmlDoc.SelectSingleNode("NasTool-Douban_Setting").SelectSingleNode("Douban_SynDays"), XmlElement).InnerText
+                If IsNumeric(DayStr) Then
+                    Config_Douban_SynDays = Convert.ToInt32(DayStr)
+                Else
+                    Config_Douban_SynDays = -1
+                End If
+                If IsNothing(Config_Douban_SynDays) OrElse Config_Douban_SynDays < 0 Then
+                    Config_Douban_SynDays = -1
+                    RichTextBox_Log.AppendText("#Config_Douban_SynDays:" & Config_Douban_SynDays & "(无限制)" & vbCrLf)
+                Else
+                    Douban_Deadline = DateAdd(DateInterval.Day, 0 - Config_Douban_SynDays, Now)
+                    RichTextBox_Log.AppendText("#Config_Douban_SynDays:" & Config_Douban_SynDays & "(" & Format(Douban_Deadline, "yyyy/MM/dd HH:mm:ss") & "之后)" & vbCrLf)
+                End If
             End If
         Catch ex As Exception
             MsgBox(ex.Message.ToString)
         End Try
     End Sub
     Sub ReadDB(ByVal DB_Path As String)
-        RichTextBox_Log.AppendText("🔄更新数据库:" & vbCrLf)
+        RichTextBox_Log.AppendText(vbCrLf & "♻️更新数据库:" & vbCrLf)
         Dim tempDataSet As DataSet = SQLDataBaseQeury("SELECT TMDBID FROM DOWNLOAD_HISTORY", DataBaseConnection)
         DownLoad_Arr.Clear()
         For i = 0 To tempDataSet.Tables(0).Rows.Count - 1
             DownLoad_Arr.Add(tempDataSet.Tables(0).Rows(i).Item("TMDBID"))
         Next
-        RichTextBox_Log.AppendText("->已下载项目:" & DownLoad_Arr.Count & vbCrLf)
+        RichTextBox_Log.AppendText(" >已下载项目:" & DownLoad_Arr.Count & vbCrLf)
         tempDataSet = SQLDataBaseQeury("SELECT TMDBID,ID FROM RSS_MOVIES", DataBaseConnection)
         Rss_Arr.Clear()
         For i = 0 To tempDataSet.Tables(0).Rows.Count - 1
             Rss_Arr.Add(tempDataSet.Tables(0).Rows(i).Item("TMDBID").ToString)
             RssID_Arr.Add(tempDataSet.Tables(0).Rows(i).Item("ID").ToString)
         Next
-        RichTextBox_Log.AppendText("->读取已订阅项目:" & Rss_Arr.Count & vbCrLf)
+        RichTextBox_Log.AppendText(" >读取已订阅项目:" & Rss_Arr.Count & vbCrLf)
     End Sub
     Function GetPage_Douban_IMDB(ByVal DoubanID As String) As String
         Dim UrlCode As String = GetWebCode("https://movie.douban.com/subject/" & DoubanID & "/")
@@ -229,12 +279,11 @@ Public Class MainForm
         Return IMDB.Trim
     End Function
     Function GetPage_TMDB(ByVal KeyWord As String) As ArrayList
-        'RichTextBox_Log.AppendText( "正在TMDB上搜索:" & KeyWord & vbCrLf
         ToolStripStatusLabel1.Text = "正在TMDB上搜索:" & KeyWord
         Dim UrlCode As String = GetWebCode("https://www.themoviedb.org/search?query=" & KeyWord)
         Dim Strlist As String() = Split(UrlCode, "class=" & Chr(34) & "result" & Chr(34) & " href=" & Chr(34) & "/movie/") ' tt15398776<br>
         Dim SearchArr As New ArrayList
-        RichTextBox_Log.AppendText("找到" & KeyWord & "(TMDB)结果:" & Strlist.Count & vbCrLf)
+        RichTextBox_Log.AppendText("<" & KeyWord & ">找到TMDB结果:" & Strlist.Count & vbCrLf)
         If Strlist.Length > 0 Then
             For i = 1 To Strlist.Length - 1
                 Dim TMDBstr As String = Split(Strlist(i), Chr(34) & "><h2>")(0)
@@ -280,28 +329,40 @@ Public Class MainForm
         ToolStripStatusLabel1.Text = "正在读取ID<" & Config_DoubanID & ">用户Movie_Wish列表"
         Dim CheckRepeatList As New ArrayList
         Dim DoubanWishList As New ArrayList
-        Dim UrlCode As String = GetWebCode("https://mouban.mythsman.com/guest/user_movie?id=" & DoubanId & "&action=wish")
-        Dim JsonObj As JObject = JsonConvert.DeserializeObject(Replace(UrlCode, vbCrLf, ""))
-        JsonObj = JsonConvert.DeserializeObject(JsonObj("result").ToString())
-        Dim JArr As JArray = JsonConvert.DeserializeObject(JsonObj("comment").ToString())
         Dim sum As Integer = 0
-        For i = 0 To JArr.Count - 1
-            Dim JItem As JObject = JsonConvert.DeserializeObject(JArr(i)("item").ToString())
-            Dim DoubanInfo As MInfos
-            DoubanInfo.M_ID = JItem("douban_id")
-            DoubanInfo.M_Name = JItem("title")
-            If CheckRepeatList.Contains(DoubanInfo.M_ID) = False Then
-                DoubanWishList.Add(DoubanInfo)
-                CheckRepeatList.Add(DoubanInfo.M_ID)
-                sum += 1
+        Try
+            Dim UrlCode As String = GetWebCode("https://mouban.mythsman.com/guest/user_movie?id=" & DoubanId & "&action=wish")
+            Dim JsonObj As JObject = JsonConvert.DeserializeObject(Replace(UrlCode, vbCrLf, ""))
+            If Convert.ToBoolean(JsonObj("success")) Then
+                JsonObj = JsonConvert.DeserializeObject(JsonObj("result").ToString())
+                Dim JArr As JArray = JsonConvert.DeserializeObject(JsonObj("comment").ToString())
+                For i = 0 To JArr.Count - 1
+                    If Config_Douban_SynDays = -1 OrElse Convert.ToDateTime(JArr(i)("mark_date")) > Douban_Deadline Then
+                        Dim JItem As JObject = JsonConvert.DeserializeObject(JArr(i)("item").ToString())
+                        Dim DoubanInfo As MInfos
+                        DoubanInfo.M_ID = JItem("douban_id")
+                        DoubanInfo.M_Name = JItem("title")
+                        If CheckRepeatList.Contains(DoubanInfo.M_ID) = False Then
+                            DoubanWishList.Add(DoubanInfo)
+                            CheckRepeatList.Add(DoubanInfo.M_ID)
+                            sum += 1
+                        End If
+                    End If
+                Next
+                RichTextBox_Log.AppendText(vbCrLf & "🔰读取ID<" & Config_DoubanID & ">用户Movie_Wish列表有效项目:" & sum & vbCrLf)
+            Else
+                RichTextBox_Log.AppendText(vbCrLf & "🔰读取ID<" & Config_DoubanID & ">用户Movie_Wish列表有效项目:失败" & vbCrLf)
             End If
-        Next
-        RichTextBox_Log.AppendText("读取ID<" & Config_DoubanID & ">用户Movie_Wish列表有效项目:" & sum & vbCrLf)
+        Catch ex As Exception
+        End Try
         Return DoubanWishList
     End Function
     Sub GoGet()
         NewMovieAddArr.Clear()
         Dim DoubanList As ArrayList = FreshDoubanWish(Config_DoubanID)
+        If DoubanList.Count > 0 Then
+            RichTextBox_Log.AppendText(vbCrLf & "🛃" & "开始匹配TMDB_ID:" & vbCrLf)
+        End If
         For i = 0 To DoubanList.Count - 1
             Dim doubaninfo_input As MInfos = DoubanList(i)
             Dim NewMovie_TMDB As String = CompareRight_TMDB(doubaninfo_input)
@@ -332,10 +393,12 @@ Public Class MainForm
         Next
         If NewMovieAddArr.Count > 0 Then
             ToolStripStatusLabel1.Text = "检测豆瓣完毕:可以添加" & CType(NewMovieAddArr(0), OutputInfos).NAME & "等" & NewMovieAddArr.Count & "个项目."
+            ToolStripLabel2.Enabled = True
         Else
             ToolStripStatusLabel1.Text = "检测豆瓣完毕:" & "没有项目需要添加."
         End If
         RichTextBox_Log.AppendText(vbCrLf & ToolStripStatusLabel1.Text & vbCrLf)
+        GoGetThread.Abort()
     End Sub
     Function GetPage_TMDB_Moreinfo(ByVal Out_M As OutputInfos) As OutputInfos
         Dim UrlCode As String = GetWebCode("https://api.themoviedb.org/3/movie/" & Out_M.TMDBID & "?api_key=" & Config_TMDB_API)
@@ -352,40 +415,14 @@ Public Class MainForm
         End If
         Return Out_M
     End Function
+
+    Private Sub ToolStripLabel3_Click(sender As Object, e As EventArgs) Handles ToolStripLabel3.Click
+        Diagnostics.Process.Start(System.Environment.CurrentDirectory & "\")
+    End Sub
+
     Private Sub RichTextBox_Log_TextChanged(sender As Object, e As EventArgs) Handles RichTextBox_Log.TextChanged
         RichTextBox_Log.SelectionStart = RichTextBox_Log.TextLength
         RichTextBox_Log.ScrollToCaret()
-    End Sub
-    Private Sub ToolStripLabel2_Click(sender As Object, e As EventArgs) Handles ToolStripLabel2.Click
-        If NewMovieAddArr.Count > 0 Then
-            Dim FailNum As Integer = 0
-            For i = 0 To NewMovieAddArr.Count - 1
-                Dim Temp_Out As OutputInfos = NewMovieAddArr(i)
-                Dim sqlcommandStr As String = "INSERT INTO RSS_MOVIES VALUES(" &
-                    GetMinId() & ",'" &
-                  Temp_Out.NAME & "','" &
-                  Temp_Out.YEAR & "','','" &
-                  Temp_Out.TMDBID & "','" &
-                  Temp_Out.IMAGE & "','[]','[]',0,'','','','','','','',0,'S','','" &
-                  Temp_Out.NOTE & "')"
-                Try
-                    SQLDataBaseQeury(sqlcommandStr, DataBaseConnection)
-                    If ResRQeury = "" Then
-                    Else
-                        RichTextBox_Log.AppendText("⛔添加订阅错误" & ResRQeury.ToString & vbCrLf)
-                        FailNum += 1
-                    End If
-                Catch ex As Exception
-                    FailNum += 1
-                End Try
-            Next
-            ToolStripStatusLabel1.Text = "添加订阅完成:总计:" & NewMovieAddArr.Count & "[成功" & NewMovieAddArr.Count - FailNum & "/失败:" & FailNum & "]"
-            RichTextBox_Log.AppendText(vbCrLf & ToolStripStatusLabel1.Text & vbCrLf)
-            ReadDB(Config_DB_Path)
-            NewMovieAddArr.Clear()
-        Else
-            ToolStripStatusLabel1.Text = "没有要添加订阅的项目."
-        End If
     End Sub
     Function GetMinId() As Integer
         Dim resNum As Integer = RssID_Arr.Count - 1
@@ -405,7 +442,4 @@ Public Class MainForm
         RssID_Arr.Add(resNum)
         Return resNum
     End Function
-    Private Sub ToolStripLabel1_Click(sender As Object, e As EventArgs) Handles ToolStripLabel1.Click
-        GoGetThread.Start()
-    End Sub
 End Class
