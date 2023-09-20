@@ -25,6 +25,6 @@
 
 0～:只搜寻*天前新添加的豆瓣wish.
 
-- <RandomSleep></RandomSleep>
+ - <Random_Sleep></Random_Sleep>
 
 'True/False:启用/关闭随机睡眠（'留空：默认为True，建议开启.）
