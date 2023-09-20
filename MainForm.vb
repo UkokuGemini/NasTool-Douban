@@ -262,11 +262,11 @@ Public Class MainForm
                     RichTextBox_Log.AppendText("#Config_Douban_SynDays:" & Config_Douban_SynDays & "(" & Format(Douban_Deadline, "yyyy/MM/dd HH:mm:ss") & "之后)" & vbCrLf)
                 End If
                 Try
-                    Config_RandomSleep = Convert.ToBoolean(CType(xmlDoc.SelectSingleNode("NasTool-Douban_Setting").SelectSingleNode("TMDB_API"), XmlElement).InnerText)
+                    Config_RandomSleep = Convert.ToBoolean(CType(xmlDoc.SelectSingleNode("NasTool-Douban_Setting").SelectSingleNode("Random_Sleep"), XmlElement).InnerText)
                 Catch ex As Exception
                     Config_RandomSleep = True
                 End Try
-                RichTextBox_Log.AppendText("#Config_RandomSleep:" & Config_RandomSleep & vbCrLf)
+                RichTextBox_Log.AppendText("#Config_Random_Sleep:" & Config_RandomSleep & vbCrLf)
             End If
         Catch ex As Exception
             MsgBox(ex.Message.ToString)
