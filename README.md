@@ -24,3 +24,7 @@
 -1:无日期限制
 
 0～:只搜寻*天前新添加的豆瓣wish.
+
+- <RandomSleep></RandomSleep>
+
+'True/False:启用/关闭随机睡眠（'留空：默认为True，建议开启.）
