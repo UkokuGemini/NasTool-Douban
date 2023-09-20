@@ -406,10 +406,6 @@ Public Class MainForm
                 Else
                     RichTextBox_Log.AppendText("❌" & vbTab & "<" & doubaninfo_input.M_Name & ">获取TMDB失败." & vbCrLf)
                 End If
-                '
-                If NewMovieAddArr.Count >= 5 Then
-                    Exit For
-                End If
             End If
         Next
         If NewMovieAddArr.Count > 0 Then
@@ -419,8 +415,8 @@ Public Class MainForm
             ToolStripStatusLabel1.Text = "检测豆瓣完毕:" & "没有项目需要添加."
         End If
         RichTextBox_Log.AppendText(vbCrLf & ToolStripStatusLabel1.Text & vbCrLf)
-        GoGetThread.Abort()
         ToolStripLabel4.Visible = False
+        GoGetThread.Abort()
     End Sub
     Function GetPage_TMDB_Moreinfo(ByVal Out_M As OutputInfos) As OutputInfos
         Dim UrlCode As String = GetWebCode("https://api.themoviedb.org/3/movie/" & Out_M.TMDBID & "?api_key=" & Config_TMDB_API)
