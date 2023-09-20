@@ -32,6 +32,7 @@ Public Class MainForm
     Dim DownLoad_Arr, Rss_Arr, RssID_Arr As New ArrayList
     Dim NewMovieAddArr As New ArrayList
     Dim GoGetThread As Thread
+    Dim DoubanList As New ArrayList
     Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         Me.Text = My.Application.Info.AssemblyName & "[" & My.Application.Info.Version.ToString & "]"
         Me.CenterToScreen()
@@ -48,7 +49,11 @@ Public Class MainForm
         Catch ex As Exception
         End Try
     End Sub
+    Dim NumMark As Integer = 0
     Private Sub ToolStripLabel1_Click(sender As Object, e As EventArgs) Handles ToolStripLabel1.Click
+        NumMark = 0
+        NewMovieAddArr.Clear()
+        DoubanList = FreshDoubanWish(Config_DoubanID)
         GoGetThread = New Thread(AddressOf GoGet)
         GoGetThread.Start()
     End Sub
@@ -82,6 +87,19 @@ Public Class MainForm
             NewMovieAddArr.Clear()
         Else
             ToolStripStatusLabel1.Text = "没有要添加订阅的项目."
+        End If
+    End Sub
+    Private Sub ToolStripLabel3_Click(sender As Object, e As EventArgs) Handles ToolStripLabel3.Click
+        Diagnostics.Process.Start(System.Environment.CurrentDirectory & "\")
+    End Sub
+    Private Sub ToolStripLabel4_Click(sender As Object, e As EventArgs) Handles ToolStripLabel4.Click
+        If GoGetThread.IsAlive Then
+            GoGetThread.Abort()
+            ToolStripLabel4.Text = "继续解析[" & NumMark & "/" & DoubanList.Count & "]"
+        Else
+            GoGetThread = New Thread(AddressOf GoGet)
+            GoGetThread.Start()
+            ToolStripLabel4.Text = "暂停解析."
         End If
     End Sub
 #Region "获取网页源码"
@@ -358,12 +376,15 @@ Public Class MainForm
         Return DoubanWishList
     End Function
     Sub GoGet()
-        NewMovieAddArr.Clear()
-        Dim DoubanList As ArrayList = FreshDoubanWish(Config_DoubanID)
+        ToolStripLabel4.Visible = True
         If DoubanList.Count > 0 Then
             RichTextBox_Log.AppendText(vbCrLf & "🛃" & "开始匹配TMDB_ID:" & vbCrLf)
         End If
-        For i = 0 To DoubanList.Count - 1
+        NumMark = Math.Max(NumMark, 0)
+        NumMark = Math.Min(NumMark, DoubanList.Count - 1)
+        Dim StartNum = NumMark
+        For i = StartNum To DoubanList.Count - 1
+            NumMark = i
             Dim doubaninfo_input As MInfos = DoubanList(i)
             Dim NewMovie_TMDB As String = CompareRight_TMDB(doubaninfo_input)
             If DownLoad_Arr.Contains(NewMovie_TMDB) Then
@@ -399,6 +420,7 @@ Public Class MainForm
         End If
         RichTextBox_Log.AppendText(vbCrLf & ToolStripStatusLabel1.Text & vbCrLf)
         GoGetThread.Abort()
+        ToolStripLabel4.Visible = False
     End Sub
     Function GetPage_TMDB_Moreinfo(ByVal Out_M As OutputInfos) As OutputInfos
         Dim UrlCode As String = GetWebCode("https://api.themoviedb.org/3/movie/" & Out_M.TMDBID & "?api_key=" & Config_TMDB_API)
@@ -415,11 +437,6 @@ Public Class MainForm
         End If
         Return Out_M
     End Function
-
-    Private Sub ToolStripLabel3_Click(sender As Object, e As EventArgs) Handles ToolStripLabel3.Click
-        Diagnostics.Process.Start(System.Environment.CurrentDirectory & "\")
-    End Sub
-
     Private Sub RichTextBox_Log_TextChanged(sender As Object, e As EventArgs) Handles RichTextBox_Log.TextChanged
         RichTextBox_Log.SelectionStart = RichTextBox_Log.TextLength
         RichTextBox_Log.ScrollToCaret()
