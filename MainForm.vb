@@ -28,6 +28,7 @@ Public Class MainForm
     Dim Config_DoubanID As String
     Dim Config_TMDB_API As String
     Dim Config_Douban_SynDays As Integer
+    Dim Config_RandomSleep As Boolean
     Dim Douban_Deadline As Date
     Dim DownLoad_Arr, Rss_Arr, RssID_Arr As New ArrayList
     Dim NewMovieAddArr As New ArrayList
@@ -260,6 +261,12 @@ Public Class MainForm
                     Douban_Deadline = DateAdd(DateInterval.Day, 0 - Config_Douban_SynDays, Now)
                     RichTextBox_Log.AppendText("#Config_Douban_SynDays:" & Config_Douban_SynDays & "(" & Format(Douban_Deadline, "yyyy/MM/dd HH:mm:ss") & "之后)" & vbCrLf)
                 End If
+                Try
+                    Config_RandomSleep = Convert.ToBoolean(CType(xmlDoc.SelectSingleNode("NasTool-Douban_Setting").SelectSingleNode("TMDB_API"), XmlElement).InnerText)
+                Catch ex As Exception
+                    Config_RandomSleep = True
+                End Try
+                RichTextBox_Log.AppendText("#Config_RandomSleep:" & Config_RandomSleep & vbCrLf)
             End If
         Catch ex As Exception
             MsgBox(ex.Message.ToString)
@@ -406,6 +413,10 @@ Public Class MainForm
                 Else
                     RichTextBox_Log.AppendText("❌" & vbTab & "<" & doubaninfo_input.M_Name & ">获取TMDB失败." & vbCrLf)
                 End If
+            End If
+            If Config_RandomSleep Then
+                Randomize()
+                Threading.Thread.Sleep(500 + Rnd() * 10000)
             End If
         Next
         If NewMovieAddArr.Count > 0 Then
