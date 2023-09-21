@@ -34,6 +34,7 @@ Public Class MainForm
     Dim NewMovieAddArr As New ArrayList
     Dim GoGetThread As Thread
     Dim DoubanList As New ArrayList
+    Dim NumMark As Integer = 0
     Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         Me.Text = My.Application.Info.AssemblyName & "[" & My.Application.Info.Version.ToString & "]"
         Me.CenterToScreen()
@@ -42,6 +43,10 @@ Public Class MainForm
         ReadSettingXml()
         DataBaseConnection.ConnectionString = "Data Source=" & Config_DB_Path
         ReadDB(Config_DB_Path)
+        RichTextBox_Log.AppendText(vbCrLf & TestWebsite("https://movie.douban.com/", "👁️‍🗨️[连通性测试]豆瓣网页:"))
+        RichTextBox_Log.AppendText(TestWebsite("https://mouban.mythsman.com/guest/check_user?id=" & Config_DoubanID, "👁️‍🗨️[连通性测试]豆瓣API:"))
+        RichTextBox_Log.AppendText(TestWebsite("https://www.themoviedb.org/search?query=" & Config_TMDB_API, "👁️‍🗨️[连通性测试]TMDB_Search:"))
+        RichTextBox_Log.AppendText(TestWebsite("https://api.themoviedb.org/3/movie/0?api_key=" & Config_TMDB_API, "👁️‍🗨️[连通性测试]TMDB_API:"))
     End Sub
     Private Sub MainForm_FormClosing(sender As Object, e As FormClosingEventArgs) Handles MyBase.FormClosing
         Try
@@ -50,7 +55,6 @@ Public Class MainForm
         Catch ex As Exception
         End Try
     End Sub
-    Dim NumMark As Integer = 0
     Private Sub ToolStripLabel1_Click(sender As Object, e As EventArgs) Handles ToolStripLabel1.Click
         NumMark = 0
         NewMovieAddArr.Clear()
@@ -226,6 +230,14 @@ Public Class MainForm
         Return Res
     End Function '数据库操作指令
 #End Region
+    Function TestWebsite(ByVal UrlStr As String, ByVal RespondStr As String) As String
+        Dim UrlCode As String = GetWebCode(UrlStr)
+        If UrlCode = "" OrElse UrlCode = "<Error:Nothing>" Then
+            Return RespondStr & "❌" & vbCrLf
+        Else
+            Return RespondStr & "✔️" & vbCrLf
+        End If
+    End Function
     Sub ReadSettingXml()
         RichTextBox_Log.AppendText(Format(Now, "yyyy/MM/dd HH:mm:ss") & vbCrLf & "💠配置:" & vbCrLf)
         Dim SettingPath As String = Directory.GetCurrentDirectory & "\NasTool-Douban_Setting.Xml"
@@ -320,7 +332,7 @@ Public Class MainForm
     End Function
     Function GetPage_TMDB_IMDB(ByVal TMDB As String) As String
         Dim UrlCode As String = GetWebCode("https://api.themoviedb.org/3/movie/" & TMDB & "?api_key=" & Config_TMDB_API)
-        If UrlCode = "" Then
+        If UrlCode = "" OrElse UrlCode = "<Error:Nothing>" Then
             Return Nothing
         Else
             Dim JsonObj As New With {.imdb_id = ""}
