@@ -121,8 +121,7 @@ Public Class MainForm
         Try
             httpResp = CType(httpReq.GetResponse(), HttpWebResponse)
         Catch
-            Debug.Print("weberror")
-            GetWebCode = "<title>no thing found</title>" : Exit Function
+            GetWebCode = "<Error:Nothing>" : Exit Function
         End Try
         '以上为网络数据获取
         ioS = CType(httpResp.GetResponseStream, Stream)
@@ -130,7 +129,6 @@ Public Class MainForm
             Try
                 dataQue.Enqueue(ioS.ReadByte)
             Catch
-                Debug.Print("read error")
                 Exit Do
             End Try
         Loop
@@ -156,7 +154,7 @@ Public Class MainForm
         '以上，按照获得的编码类型进行数据转换
         '将得到的内容进行最后处理，比如判断是不是有出现字符串为空的情况
         GetWebCode = tCode
-        If tCode = "" Then GetWebCode = "<title>no thing found</title>"
+        If tCode = "" Then GetWebCode = "<Error:Nothing>"
     End Function 'Tools
     Function GetByDiv2(ByVal code As String, ByVal divBegin As String, ByVal divEnd As String)  '获取分隔符所夹的内容[完成，未测试]
         '仅用于获取编码数据
@@ -357,6 +355,9 @@ Public Class MainForm
         Dim sum As Integer = 0
         Try
             Dim UrlCode As String = GetWebCode("https://mouban.mythsman.com/guest/user_movie?id=" & DoubanId & "&action=wish")
+            If UrlCode = "<Error:Nothing>" Then
+                RichTextBox_Log.AppendText(vbCrLf & "🔰读取ID<" & Config_DoubanID & ">用户Movie_Wish列表有效项目:失败" & vbCrLf)
+            End If
             Dim JsonObj As JObject = JsonConvert.DeserializeObject(Replace(UrlCode, vbCrLf, ""))
             If Convert.ToBoolean(JsonObj("success")) Then
                 JsonObj = JsonConvert.DeserializeObject(JsonObj("result").ToString())
@@ -388,7 +389,7 @@ Public Class MainForm
             RichTextBox_Log.AppendText(vbCrLf & "🛃" & "开始匹配TMDB_ID:" & vbCrLf)
         End If
         NumMark = Math.Max(NumMark, 0)
-        NumMark = Math.Min(NumMark, DoubanList.Count - 1)
+        NumMark = Math.Min(NumMark, Math.Max(0, DoubanList.Count - 1))
         Dim StartNum = NumMark
         For i = StartNum To DoubanList.Count - 1
             NumMark = i
@@ -431,7 +432,7 @@ Public Class MainForm
     End Sub
     Function GetPage_TMDB_Moreinfo(ByVal Out_M As OutputInfos) As OutputInfos
         Dim UrlCode As String = GetWebCode("https://api.themoviedb.org/3/movie/" & Out_M.TMDBID & "?api_key=" & Config_TMDB_API)
-        If UrlCode = "<title>no thing found</title>" Then
+        If UrlCode = "<Error:Nothing>" Then
             Out_M.TMDBID = ""
         Else
             Dim JsonObj As JObject = JsonConvert.DeserializeObject(UrlCode)
