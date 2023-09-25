@@ -43,6 +43,8 @@ Public Class MainForm
         ReadSettingXml()
         DataBaseConnection.ConnectionString = "Data Source=" & Config_DB_Path
         ReadDB(Config_DB_Path)
+    End Sub
+    Sub CheckWebSite()
         RichTextBox_Log.AppendText(vbCrLf & TestWebsite("https://movie.douban.com/", "👁️‍🗨️[连通性测试]豆瓣网页:"))
         RichTextBox_Log.AppendText(TestWebsite("https://mouban.mythsman.com/guest/check_user?id=" & Config_DoubanID, "👁️‍🗨️[连通性测试]豆瓣API:"))
         RichTextBox_Log.AppendText(TestWebsite("https://www.themoviedb.org/search?query=" & Config_TMDB_API, "👁️‍🗨️[连通性测试]TMDB_Search:"))

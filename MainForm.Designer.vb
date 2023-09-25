@@ -64,43 +64,43 @@ Partial Class MainForm
         Me.ToolStrip1.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.ToolStripLabel3, Me.ToolStripSeparator3, Me.ToolStripLabel1, Me.ToolStripSeparator1, Me.ToolStripLabel2, Me.ToolStripSeparator2, Me.ToolStripLabel4})
         Me.ToolStrip1.Location = New System.Drawing.Point(0, 0)
         Me.ToolStrip1.Name = "ToolStrip1"
-        Me.ToolStrip1.Size = New System.Drawing.Size(1224, 28)
+        Me.ToolStrip1.Size = New System.Drawing.Size(1224, 38)
         Me.ToolStrip1.TabIndex = 4
         Me.ToolStrip1.Text = "ToolStrip1"
         '
         'ToolStripLabel3
         '
         Me.ToolStripLabel3.Name = "ToolStripLabel3"
-        Me.ToolStripLabel3.Size = New System.Drawing.Size(82, 23)
+        Me.ToolStripLabel3.Size = New System.Drawing.Size(82, 33)
         Me.ToolStripLabel3.Text = "打开目录"
         '
         'ToolStripSeparator3
         '
         Me.ToolStripSeparator3.Name = "ToolStripSeparator3"
-        Me.ToolStripSeparator3.Size = New System.Drawing.Size(6, 28)
+        Me.ToolStripSeparator3.Size = New System.Drawing.Size(6, 38)
         '
         'ToolStripLabel1
         '
         Me.ToolStripLabel1.Name = "ToolStripLabel1"
-        Me.ToolStripLabel1.Size = New System.Drawing.Size(82, 23)
+        Me.ToolStripLabel1.Size = New System.Drawing.Size(82, 33)
         Me.ToolStripLabel1.Text = "检测豆瓣"
         '
         'ToolStripSeparator1
         '
         Me.ToolStripSeparator1.Name = "ToolStripSeparator1"
-        Me.ToolStripSeparator1.Size = New System.Drawing.Size(6, 28)
+        Me.ToolStripSeparator1.Size = New System.Drawing.Size(6, 38)
         '
         'ToolStripLabel2
         '
         Me.ToolStripLabel2.Enabled = False
         Me.ToolStripLabel2.Name = "ToolStripLabel2"
-        Me.ToolStripLabel2.Size = New System.Drawing.Size(82, 23)
+        Me.ToolStripLabel2.Size = New System.Drawing.Size(82, 33)
         Me.ToolStripLabel2.Text = "添加订阅"
         '
         'ToolStripSeparator2
         '
         Me.ToolStripSeparator2.Name = "ToolStripSeparator2"
-        Me.ToolStripSeparator2.Size = New System.Drawing.Size(6, 28)
+        Me.ToolStripSeparator2.Size = New System.Drawing.Size(6, 38)
         '
         'ToolStripLabel4
         '
@@ -116,9 +116,9 @@ Partial Class MainForm
         Me.RichTextBox_Log.BorderStyle = System.Windows.Forms.BorderStyle.None
         Me.RichTextBox_Log.Dock = System.Windows.Forms.DockStyle.Fill
         Me.RichTextBox_Log.Location = New System.Drawing.Point(4, 28)
-        Me.RichTextBox_Log.Margin = New System.Windows.Forms.Padding(4, 4, 4, 4)
+        Me.RichTextBox_Log.Margin = New System.Windows.Forms.Padding(4)
         Me.RichTextBox_Log.Name = "RichTextBox_Log"
-        Me.RichTextBox_Log.Size = New System.Drawing.Size(1216, 562)
+        Me.RichTextBox_Log.Size = New System.Drawing.Size(1216, 552)
         Me.RichTextBox_Log.TabIndex = 5
         Me.RichTextBox_Log.Text = ""
         '
@@ -127,11 +127,11 @@ Partial Class MainForm
         Me.GroupBox1.Controls.Add(Me.RichTextBox_Log)
         Me.GroupBox1.Dock = System.Windows.Forms.DockStyle.Fill
         Me.GroupBox1.Font = New System.Drawing.Font("微软雅黑", 9.0!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
-        Me.GroupBox1.Location = New System.Drawing.Point(0, 28)
-        Me.GroupBox1.Margin = New System.Windows.Forms.Padding(4, 4, 4, 4)
+        Me.GroupBox1.Location = New System.Drawing.Point(0, 38)
+        Me.GroupBox1.Margin = New System.Windows.Forms.Padding(4)
         Me.GroupBox1.Name = "GroupBox1"
-        Me.GroupBox1.Padding = New System.Windows.Forms.Padding(4, 4, 4, 4)
-        Me.GroupBox1.Size = New System.Drawing.Size(1224, 594)
+        Me.GroupBox1.Padding = New System.Windows.Forms.Padding(4)
+        Me.GroupBox1.Size = New System.Drawing.Size(1224, 584)
         Me.GroupBox1.TabIndex = 6
         Me.GroupBox1.TabStop = False
         Me.GroupBox1.Text = "日志"
@@ -146,7 +146,7 @@ Partial Class MainForm
         Me.Controls.Add(Me.ToolStrip1)
         Me.Font = New System.Drawing.Font("微软雅黑", 9.0!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
         Me.Icon = CType(resources.GetObject("$this.Icon"), System.Drawing.Icon)
-        Me.Margin = New System.Windows.Forms.Padding(5, 5, 5, 5)
+        Me.Margin = New System.Windows.Forms.Padding(5)
         Me.Name = "MainForm"
         Me.Text = "Form1"
         Me.StatusStrip1.ResumeLayout(False)
