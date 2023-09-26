@@ -35,6 +35,7 @@ Public Class MainForm
     Dim GoGetThread As Thread
     Dim DoubanList As New ArrayList
     Dim NumMark As Integer = 0
+    Dim RandomTMDBID As Integer = 575602
     Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         Me.Text = My.Application.Info.AssemblyName & "[" & My.Application.Info.Version.ToString & "]"
         Me.CenterToScreen()
@@ -48,7 +49,8 @@ Public Class MainForm
         RichTextBox_Log.AppendText(vbCrLf & TestWebsite("https://movie.douban.com/", "👁️‍🗨️[连通性测试]豆瓣网页:"))
         RichTextBox_Log.AppendText(TestWebsite("https://mouban.mythsman.com/guest/check_user?id=" & Config_DoubanID, "👁️‍🗨️[连通性测试]豆瓣API:"))
         RichTextBox_Log.AppendText(TestWebsite("https://www.themoviedb.org/search?query=" & Config_TMDB_API, "👁️‍🗨️[连通性测试]TMDB_Search:"))
-        RichTextBox_Log.AppendText(TestWebsite("https://api.themoviedb.org/3/movie/0?api_key=" & Config_TMDB_API, "👁️‍🗨️[连通性测试]TMDB_API:"))
+        RichTextBox_Log.AppendText(TestWebsite("https://api.themoviedb.org/3/movie/" & RandomTMDBID & "?api_key=" & Config_TMDB_API, "👁️‍🗨️[连通性测试]TMDB_API:"))
+        ToolStripStatusLabel1.Text = "连通性检测完毕."
     End Sub
     Private Sub MainForm_FormClosing(sender As Object, e As FormClosingEventArgs) Handles MyBase.FormClosing
         Try
@@ -123,7 +125,6 @@ Public Class MainForm
         httpReq.IfModifiedSince = sTime
         httpReq.Method = "GET"
         httpReq.Timeout = 7000
-
         Try
             httpResp = CType(httpReq.GetResponse(), HttpWebResponse)
         Catch
@@ -286,19 +287,26 @@ Public Class MainForm
     End Sub
     Sub ReadDB(ByVal DB_Path As String)
         RichTextBox_Log.AppendText(vbCrLf & "♻️更新数据库:" & vbCrLf)
-        Dim tempDataSet As DataSet = SQLDataBaseQeury("SELECT TMDBID FROM DOWNLOAD_HISTORY", DataBaseConnection)
-        DownLoad_Arr.Clear()
-        For i = 0 To tempDataSet.Tables(0).Rows.Count - 1
-            DownLoad_Arr.Add(tempDataSet.Tables(0).Rows(i).Item("TMDBID"))
-        Next
-        RichTextBox_Log.AppendText(" >已下载项目:" & DownLoad_Arr.Count & vbCrLf)
-        tempDataSet = SQLDataBaseQeury("SELECT TMDBID,ID FROM RSS_MOVIES", DataBaseConnection)
+        Dim tempDataSet As DataSet = SQLDataBaseQeury("SELECT TMDBID,ID FROM RSS_MOVIES", DataBaseConnection)
+        If tempDataSet.Tables(0).Rows.Count > 0 Then
+            RandomTMDBID = Convert.ToInt32(tempDataSet.Tables(0).Rows(Int(Rnd() * tempDataSet.Tables(0).Rows.Count)).Item("TMDBID"))
+        End If
         Rss_Arr.Clear()
         For i = 0 To tempDataSet.Tables(0).Rows.Count - 1
             Rss_Arr.Add(tempDataSet.Tables(0).Rows(i).Item("TMDBID").ToString)
             RssID_Arr.Add(tempDataSet.Tables(0).Rows(i).Item("ID").ToString)
         Next
         RichTextBox_Log.AppendText(" >读取已订阅项目:" & Rss_Arr.Count & vbCrLf)
+        '
+        tempDataSet = SQLDataBaseQeury("SELECT TMDBID FROM DOWNLOAD_HISTORY", DataBaseConnection)
+        If tempDataSet.Tables(0).Rows.Count > 0 Then
+            RandomTMDBID = Convert.ToInt32(tempDataSet.Tables(0).Rows(Int(Rnd() * tempDataSet.Tables(0).Rows.Count)).Item("TMDBID"))
+        End If
+        DownLoad_Arr.Clear()
+        For i = 0 To tempDataSet.Tables(0).Rows.Count - 1
+            DownLoad_Arr.Add(tempDataSet.Tables(0).Rows(i).Item("TMDBID"))
+        Next
+        RichTextBox_Log.AppendText(" >已下载项目:" & DownLoad_Arr.Count & vbCrLf)
     End Sub
     Function GetPage_Douban_IMDB(ByVal DoubanID As String) As String
         Dim UrlCode As String = GetWebCode("https://movie.douban.com/subject/" & DoubanID & "/")
@@ -461,6 +469,7 @@ Public Class MainForm
     End Function
 
     Private Sub ToolStripLabel5_Click(sender As Object, e As EventArgs) Handles ToolStripLabel5.Click
+        ToolStripStatusLabel1.Text = "检测连通性..."
         CheckWebSite()
     End Sub
 
