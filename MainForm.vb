@@ -459,6 +459,11 @@ Public Class MainForm
         End If
         Return Out_M
     End Function
+
+    Private Sub ToolStripLabel5_Click(sender As Object, e As EventArgs) Handles ToolStripLabel5.Click
+        CheckWebSite()
+    End Sub
+
     Private Sub RichTextBox_Log_TextChanged(sender As Object, e As EventArgs) Handles RichTextBox_Log.TextChanged
         RichTextBox_Log.SelectionStart = RichTextBox_Log.TextLength
         RichTextBox_Log.ScrollToCaret()
