@@ -236,9 +236,9 @@ Public Class MainForm
     Function TestWebsite(ByVal UrlStr As String, ByVal RespondStr As String) As String
         Dim UrlCode As String = GetWebCode(UrlStr)
         If UrlCode = "" OrElse UrlCode = "<Error:Nothing>" Then
-            Return RespondStr & "❌" & vbCrLf
+            Return RespondStr & "❌" & “【“ & UrlStr & ”】” & vbCrLf
         Else
-            Return RespondStr & "✔️" & vbCrLf
+            Return RespondStr & "✔️" & “【“ & UrlStr & ”】” & vbCrLf
         End If
     End Function
     Sub ReadSettingXml()
