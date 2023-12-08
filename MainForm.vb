@@ -467,12 +467,50 @@ Public Class MainForm
         End If
         Return Out_M
     End Function
-
     Private Sub ToolStripLabel5_Click(sender As Object, e As EventArgs) Handles ToolStripLabel5.Click
         ToolStripStatusLabel1.Text = "检测连通性..."
         CheckWebSite()
     End Sub
-
+    Private Sub ToolStripLabel6_Click(sender As Object, e As EventArgs) Handles ToolStripLabel6.Click, ToolStripLabel7.Click
+        GroupBox2.Visible = Not GroupBox2.Visible
+        If GroupBox2.Visible Then
+            FreshList()
+        Else
+            ReadDB(Config_DB_Path)
+        End If
+    End Sub
+    Sub FreshList()
+        ListBox1.Items.Clear()
+        Dim tempDataSet As DataSet = SQLDataBaseQeury("SELECT ID,Name,TMDBID FROM RSS_MOVIES", DataBaseConnection)
+        For i = 0 To tempDataSet.Tables(0).Rows.Count - 1
+            ListBox1.Items.Add(tempDataSet.Tables(0).Rows(i).Item("Name"))
+        Next
+    End Sub
+    Private Sub ToolStripStatusLabel2_Click(sender As Object, e As EventArgs) Handles ToolStripStatusLabel2.Click
+        If ListBox1.Items.Count > 0 AndAlso ListBox1.SelectedIndex <> -1 Then
+            Dim RemIndex As Integer = ListBox1.SelectedIndex
+            Dim tempDataSet_DH As DataSet = SQLDataBaseQeury("SELECT * FROM DOWNLOAD_HISTORY", DataBaseConnection)
+            Dim tempDataSet_RM As DataSet = SQLDataBaseQeury("SELECT * FROM RSS_MOVIES", DataBaseConnection)
+            Dim SQLstr As String = "INSERT INTO DOWNLOAD_HISTORY VALUES (" & tempDataSet_DH.Tables(0).Rows.Count + 1 &
+                ",'" & tempDataSet_RM.Tables(0).Rows(ListBox1.SelectedIndex).Item("NAME") &
+                "'," & tempDataSet_RM.Tables(0).Rows(ListBox1.SelectedIndex).Item("YEAR") &
+                ",'电影'," & tempDataSet_RM.Tables(0).Rows(ListBox1.SelectedIndex).Item("TMDBID") &
+                ",0,'" & tempDataSet_RM.Tables(0).Rows(ListBox1.SelectedIndex).Item("IMAGE") &
+                "','','','','','','" & Format(Now, "yyyy-MM-dd HH:mm:ss") & "')"
+            'Dim k As Boolean = Rss_Arr.Contains(tempDataSet_RM.Tables(0).Rows(ListBox1.SelectedIndex).Item("TMDBID").ToString)
+            'Dim kk As String = SQLDataBaseExecute(SQLstr, DataBaseConnection)
+            'k = kk
+            If DownLoad_Arr.Contains(tempDataSet_RM.Tables(0).Rows(ListBox1.SelectedIndex).Item("TMDBID").ToString) OrElse SQLDataBaseExecute(SQLstr, DataBaseConnection) = "" Then
+                SQLDataBaseExecute("DELETE FROM RSS_MOVIES WHERE TMDBID = " & tempDataSet_RM.Tables(0).Rows(ListBox1.SelectedIndex).Item("TMDBID"), DataBaseConnection)
+                FreshList()
+            End If
+            Try
+                ListBox1.TopIndex = RemIndex
+                ListBox1.SelectedIndex = RemIndex
+            Catch ex As Exception
+            End Try
+        End If
+    End Sub
     Private Sub RichTextBox_Log_TextChanged(sender As Object, e As EventArgs) Handles RichTextBox_Log.TextChanged
         RichTextBox_Log.SelectionStart = RichTextBox_Log.TextLength
         RichTextBox_Log.ScrollToCaret()
