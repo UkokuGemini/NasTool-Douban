@@ -77,7 +77,7 @@ Public Class MainForm
                   Temp_Out.NAME & "','" &
                   Temp_Out.YEAR & "','','" &
                   Temp_Out.TMDBID & "','" &
-                  Temp_Out.IMAGE & "','[]','[]',0,'','','','','','','',0,'S','','" &
+                  Temp_Out.IMAGE & "','[]','[]',0,'','','','','','','',0,'R','','" &
                   Temp_Out.NOTE & "')"
                 Try
                     SQLDataBaseQeury(sqlcommandStr, DataBaseConnection)
