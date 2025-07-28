@@ -1,145 +1,129 @@
-import datetime
+from abc import ABCMeta, abstractmethod
 from pathlib import Path
-from threading import Lock
-from typing import Optional, Any, List, Dict, Tuple
+from typing import Any, List, Dict, Tuple, Optional
 
-import pytz
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.cron import CronTrigger
-
-from app import schemas
-from app.chain.media import MediaChain
-from app.db.subscribe_oper import SubscribeOper
-from app.db.user_oper import UserOper
-from app.schemas.types import MediaType, EventType, SystemConfigKey
-
-from app.chain.download import DownloadChain
-from app.chain.search import SearchChain
-from app.chain.subscribe import SubscribeChain
+from app.chain import ChainBase
 from app.core.config import settings
-from app.core.event import Event
-from app.core.event import eventmanager
-from app.core.metainfo import MetaInfo
-from app.helper.rss import RssHelper
-from app.log import logger
-from app.plugins import _PluginBase
-
-lock = Lock()
+from app.core.event import EventManager
+from app.db.plugindata_oper import PluginDataOper
+from app.db.systemconfig_oper import SystemConfigOper
+from app.helper.message import MessageHelper
+from app.schemas import Notification, NotificationType, MessageChannel
 
 
-class DoubanSyncSelf(_PluginBase):
+class PluginChian(ChainBase):
+    """
+    插件处理链
+    """
+    pass
+
+
+class _PluginBase(metaclass=ABCMeta):
+    """
+    插件模块基类，通过继续该类实现插件功能
+    除内置属性外，还有以下方法可以扩展或调用：
+    - stop_service() 停止插件服务
+    - get_config() 获取配置信息
+    - update_config() 更新配置信息
+    - init_plugin() 生效配置信息
+    - get_data_path() 获取插件数据保存目录
+    """
     # 插件名称
-    plugin_name = "豆瓣想看"
+    plugin_name: Optional[str] = ""
     # 插件描述
-    plugin_desc = "同步豆瓣想看数据，自动添加订阅。"
-    # 插件图标
-    plugin_icon = "douban.png"
-    # 插件版本
-    plugin_version = "2.1.0"
-    # 插件作者
-    plugin_author = "jxxghp,dwhmofly"
-    # 作者主页
-    author_url = "https://github.com/jxxghp"
-    # 插件配置项ID前缀
-    plugin_config_prefix = "doubansyncSelf_"
-    # 加载顺序
-    plugin_order = 1
-    # 可使用的用户级别
-    auth_level = 1
+    plugin_desc: Optional[str] = ""
+    # 插件顺序
+    plugin_order: Optional[int] = 9999
+    # 是否为插件分身
+    is_clone: bool = False
 
-    # 私有变量
-    _interests_url: str = "https://www.douban.com/feed/people/%s/interests"
-    _scheduler: Optional[BackgroundScheduler] = None
-    _cache_path: Optional[Path] = None
+    def __init__(self):
+        # 插件数据
+        self.plugindata = PluginDataOper()
+        # 处理链
+        self.chain = PluginChian()
+        # 系统配置
+        self.systemconfig = SystemConfigOper()
+        # 系统消息
+        self.systemmessage = MessageHelper()
+        # 事件管理器
+        self.eventmanager = EventManager()
 
-    # 配置属性
-    _enabled: bool = False
-    _onlyonce: bool = False
-    _cron: str = ""
-    _notify: bool = False
-    _days: int = 7
-    _users: str = ""
-    _clear: bool = False
-    _clearflag: bool = False
-    _search_download = False
-
+    @abstractmethod
     def init_plugin(self, config: dict = None):
+        """
+        生效配置信息
+        :param config: 配置信息字典
+        """
+        pass
 
-        # 停止现有任务
-        self.stop_service()
+    def get_name(self) -> str:
+        """
+        获取插件名称
+        :return: 插件名称
+        """
+        return self.plugin_name
 
-        # 配置
-        if config:
-            self._enabled = config.get("enabled")
-            self._cron = config.get("cron")
-            self._notify = config.get("notify")
-            self._days = config.get("days")
-            self._users = config.get("users")
-            self._onlyonce = config.get("onlyonce")
-            self._clear = config.get("clear")
-            self._search_download = config.get("search_download")
-
-        if self._enabled or self._onlyonce:
-            if self._onlyonce:
-                self._scheduler = BackgroundScheduler(timezone=settings.TZ)
-                logger.info(f"豆瓣想看服务启动，立即运行一次")
-                self._scheduler.add_job(func=self.sync, trigger='date',
-                                        run_date=datetime.datetime.now(
-                                            tz=pytz.timezone(settings.TZ)) + datetime.timedelta(seconds=3)
-                                        )
-
-                # 启动任务
-                if self._scheduler.get_jobs():
-                    self._scheduler.print_jobs()
-                    self._scheduler.start()
-
-            if self._onlyonce or self._clear:
-                # 关闭一次性开关
-                self._onlyonce = False
-                # 记录缓存清理标志
-                self._clearflag = self._clear
-                # 关闭清理缓存
-                self._clear = False
-                # 保存配置
-                self.__update_config()
-
+    @abstractmethod
     def get_state(self) -> bool:
-        return self._enabled
+        """
+        获取插件运行状态
+        """
+        pass
 
     @staticmethod
     def get_command() -> List[Dict[str, Any]]:
         """
-        定义远程控制命令
-        :return: 命令关键字、事件、描述、附带数据
-        """
-        return [{
-            "cmd": "/douban_sync",
-            "event": EventType.PluginAction,
-            "desc": "同步豆瓣想看",
-            "category": "订阅",
-            "data": {
-                "action": "douban_sync"
-            }
+        注册插件远程命令
+        [{
+            "cmd": "/xx",
+            "event": EventType.xx,
+            "desc": "名称",
+            "category": "分类，需要注册到Wechat时必须有分类",
+            "data": {}
         }]
+        """
+        pass
 
+    @staticmethod
+    def get_render_mode() -> Tuple[str, Optional[str]]:
+        """
+        获取插件渲染模式
+        :return: 1、渲染模式，支持：vue/vuetify，默认vuetify；2、vue模式下编译后文件的相对路径，默认为`dist/asserts`，vuetify模式下为None
+        """
+        return "vuetify", None
+
+    @abstractmethod
     def get_api(self) -> List[Dict[str, Any]]:
         """
-        获取插件API
+        注册插件API
         [{
             "path": "/xx",
             "endpoint": self.xxx,
             "methods": ["GET", "POST"],
-            "summary": "API说明"
+            "auth: "apikey",  # 鉴权类型：apikey/bear
+            "summary": "API名称",
+            "description": "API说明"
         }]
         """
-        return [
-            {
-                "path": "/delete_history",
-                "endpoint": self.delete_history,
-                "methods": ["GET"],
-                "summary": "删除豆瓣同步历史记录"
-            }
-        ]
+        pass
+
+    @abstractmethod
+    def get_form(self) -> Tuple[Optional[List[dict]], Dict[str, Any]]:
+        """
+        拼装插件配置页面，插件配置页面使用Vuetify组件拼装，参考：https://vuetifyjs.com/
+        :return: 1、页面配置（vuetify模式）或 None（vue模式）；2、默认数据结构
+        """
+        pass
+
+    @abstractmethod
+    def get_page(self) -> Optional[List[dict]]:
+        """
+        拼装插件详情页面，需要返回页面配置，同时附带数据
+        插件详情页面使用Vuetify组件拼装，参考：https://vuetifyjs.com/
+        :return: 页面配置（vuetify模式）或 None（vue模式）
+        """
+        pass
 
     def get_service(self) -> List[Dict[str, Any]]:
         """
@@ -152,592 +136,151 @@ class DoubanSyncSelf(_PluginBase):
             "kwargs": {} # 定时器参数
         }]
         """
-        if self._enabled and self._cron:
-            return [
-                {
-                    "id": "DoubanSync",
-                    "name": "豆瓣想看同步服务",
-                    "trigger": CronTrigger.from_crontab(self._cron),
-                    "func": self.sync,
-                    "kwargs": {}
-                }
-            ]
-        elif self._enabled:
-            return [
-                {
-                    "id": "DoubanSync",
-                    "name": "豆瓣想看同步服务",
-                    "trigger": "interval",
-                    "func": self.sync,
-                    "kwargs": {"minutes": 30}
-                }
-            ]
-        return []
+        pass
 
-    def get_form(self) -> Tuple[List[dict], Dict[str, Any]]:
+    def get_dashboard(self, key: str, **kwargs) -> Optional[Tuple[Dict[str, Any], Dict[str, Any], Optional[List[dict]]]]:
         """
-        拼装插件配置页面，需要返回两块数据：1、页面配置；2、数据结构
-        """
-        return [
-            {
-                'component': 'VForm',
-                'content': [
-                    {
-                        'component': 'VRow',
-                        'content': [
-                            {
-                                'component': 'VCol',
-                                'props': {
-                                    'cols': 12,
-                                    'md': 4
-                                },
-                                'content': [
-                                    {
-                                        'component': 'VSwitch',
-                                        'props': {
-                                            'model': 'enabled',
-                                            'label': '启用插件',
-                                        }
-                                    }
-                                ]
-                            },
-                            {
-                                'component': 'VCol',
-                                'props': {
-                                    'cols': 12,
-                                    'md': 4
-                                },
-                                'content': [
-                                    {
-                                        'component': 'VSwitch',
-                                        'props': {
-                                            'model': 'notify',
-                                            'label': '发送通知',
-                                        }
-                                    }
-                                ]
-                            },
-                            {
-                                'component': 'VCol',
-                                'props': {
-                                    'cols': 12,
-                                    'md': 4
-                                },
-                                'content': [
-                                    {
-                                        'component': 'VSwitch',
-                                        'props': {
-                                            'model': 'onlyonce',
-                                            'label': '立即运行一次',
-                                        }
-                                    }
-                                ]
-                            }
-                        ]
-                    },
-                    {
-                        'component': 'VRow',
-                        'content': [
-                            {
-                                'component': 'VCol',
-                                'props': {
-                                    'cols': 12,
-                                    'md': 6
-                                },
-                                'content': [
-                                    {
-                                        'component': 'VCronField',
-                                        'props': {
-                                            'model': 'cron',
-                                            'label': '执行周期',
-                                            'placeholder': '5位cron表达式，留空自动'
-                                        }
-                                    }
-                                ]
-                            },
-                            {
-                                'component': 'VCol',
-                                'props': {
-                                    'cols': 12,
-                                    'md': 6
-                                },
-                                'content': [
-                                    {
-                                        'component': 'VTextField',
-                                        'props': {
-                                            'model': 'days',
-                                            'label': '同步天数'
-                                        }
-                                    }
-                                ]
-                            }
-                        ]
-                    },
-                    {
-                        'component': 'VRow',
-                        'content': [
-                            {
-                                'component': 'VCol',
-                                'content': [
-                                    {
-                                        'component': 'VTextField',
-                                        'props': {
-                                            'model': 'users',
-                                            'label': '用户列表',
-                                            'placeholder': '豆瓣用户ID，多个用英文逗号分隔'
-                                        }
-                                    }
-                                ]
-                            }
-                        ]
-                    },
-                    {
-                        'component': 'VRow',
-                        'content': [
-                            {
-                                'component': 'VCol',
-                                'props': {
-                                    'cols': 12,
-                                    'md': 4
-                                },
-                                'content': [
-                                    {
-                                        'component': 'VSwitch',
-                                        'props': {
-                                            'model': 'clear',
-                                            'label': '清理历史记录',
-                                        }
-                                    }
-                                ]
-                            },
-                            {
-                                'component': 'VCol',
-                                'props': {
-                                    'cols': 12,
-                                    'md': 4,
-                                    'style': 'display:flex;align-items: center;'
-                                },
-                                'content': [
-                                    {
-                                        'component': 'VSwitch',
-                                        'props': {
-                                            'model': 'search_download',
-                                            'label': '搜索下载',
-                                        }
-                                    }
-                                ]
-                            }
-                        ]
-                    },
-                    {
-                        'component': 'VRow',
-                        'content': [
-                            {
-                                'component': 'VCol',
-                                'props': {
-                                    'cols': 12,
-                                },
-                                'content': [
-                                    {
-                                        'component': 'VAlert',
-                                        'props': {
-                                            'type': 'info',
-                                            'variant': 'tonal',
-                                            'text': '搜索下载开启后，会优先按订阅优先级规则组搜索过滤下载，搜索站点为设置的订'
-                                                    '阅站点，下载失败/无资源/剧集不完整时仍会添加订阅'
-                                        }
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                ]
-            }
-        ], {
-            "enabled": False,
-            "notify": True,
-            "onlyonce": False,
-            "cron": "*/30 * * * *",
-            "days": 7,
-            "users": "",
-            "clear": False,
-            "search_download": False
+        获取插件仪表盘页面，需要返回：1、仪表板col配置字典；2、全局配置（布局、自动刷新等）；3、仪表板页面元素配置含数据json（vuetify）或 None（vue模式）
+        1、col配置参考：
+        {
+            "cols": 12, "md": 6
         }
+        2、全局配置参考：
+        {
+            "refresh": 10, // 自动刷新时间，单位秒
+            "border": True, // 是否显示边框，默认True，为False时取消组件边框和边距，由插件自行控制
+            "title": "组件标题", // 组件标题，如有将显示该标题，否则显示插件名称
+            "subtitle": "组件子标题", // 组件子标题，缺省时不展示子标题
+        }
+        3、vuetify模式页面配置使用Vuetify组件拼装，参考：https://vuetifyjs.com/；vue模式为None
 
-    def get_page(self) -> List[dict]:
-        """
-        拼装插件详情页面，需要返回页面配置，同时附带数据
-        """
-        # 查询同步详情
-        historys = self.get_data('history')
-        if not historys:
-            return [
-                {
-                    'component': 'div',
-                    'text': '暂无数据',
-                    'props': {
-                        'class': 'text-center',
-                    }
-                }
-            ]
-        # 数据按时间降序排序
-        historys = sorted(historys, key=lambda x: x.get('time'), reverse=True)
-        # 拼装页面
-        contents = []
-        for history in historys:
-            title = history.get("title")
-            poster = history.get("poster")
-            mtype = history.get("type")
-            time_str = history.get("time")
-            doubanid = history.get("doubanid")
-            action = "下载" if history.get("action") == "download" else "订阅" if history.get("action") == "subscribe" \
-                else "存在" if history.get("action") == "exist" else history.get("action")
-            contents.append(
-                {
-                    'component': 'VCard',
-                    'content': [
-                        {
-                            "component": "VDialogCloseBtn",
-                            "props": {
-                                'innerClass': 'absolute top-0 right-0',
-                            },
-                            'events': {
-                                'click': {
-                                    'api': 'plugin/DoubanSync/delete_history',
-                                    'method': 'get',
-                                    'params': {
-                                        'doubanid': doubanid,
-                                        'apikey': settings.API_TOKEN
-                                    }
-                                }
-                            },
-                        },
-                        {
-                            'component': 'div',
-                            'props': {
-                                'class': 'd-flex justify-space-start flex-nowrap flex-row',
-                            },
-                            'content': [
-                                {
-                                    'component': 'div',
-                                    'content': [
-                                        {
-                                            'component': 'VImg',
-                                            'props': {
-                                                'src': poster,
-                                                'height': 120,
-                                                'width': 80,
-                                                'aspect-ratio': '2/3',
-                                                'class': 'object-cover shadow ring-gray-500',
-                                                'cover': True
-                                            }
-                                        }
-                                    ]
-                                },
-                                {
-                                    'component': 'div',
-                                    'content': [
-                                        {
-                                            'component': 'VCardTitle',
-                                            'props': {
-                                                'class': 'ps-1 pe-5 break-words whitespace-break-spaces'
-                                            },
-                                            'content': [
-                                                {
-                                                    'component': 'a',
-                                                    'props': {
-                                                        'href': f"https://movie.douban.com/subject/{doubanid}",
-                                                        'target': '_blank'
-                                                    },
-                                                    'text': title
-                                                }
-                                            ]
-                                        },
-                                        {
-                                            'component': 'VCardText',
-                                            'props': {
-                                                'class': 'pa-0 px-2'
-                                            },
-                                            'text': f'类型：{mtype}'
-                                        },
-                                        {
-                                            'component': 'VCardText',
-                                            'props': {
-                                                'class': 'pa-0 px-2'
-                                            },
-                                            'text': f'时间：{time_str}'
-                                        },
-                                        {
-                                            'component': 'VCardText',
-                                            'props': {
-                                                'class': 'pa-0 px-2'
-                                            },
-                                            'text': f'操作：{action}'
-                                        }
-                                    ]
-                                }
-                            ]
-                        }
-                    ]
-                }
-            )
+        kwargs参数可获取的值：1、user_agent：浏览器UA
 
-        return [
-            {
-                'component': 'div',
-                'props': {
-                    'class': 'grid gap-3 grid-info-card',
-                },
-                'content': contents
-            }
-        ]
+        :param key: 仪表盘key，根据指定的key返回相应的仪表盘数据，缺省时返回一个固定的仪表盘数据（兼容旧版）
+        """
+        pass
 
-    def __update_config(self):
+    def get_dashboard_meta(self) -> Optional[List[Dict[str, str]]]:
         """
-        更新配置
+        获取插件仪表盘元信息
+        返回示例：
+            [{
+                "key": "dashboard1", // 仪表盘的key，在当前插件范围唯一
+                "name": "仪表盘1" // 仪表盘的名称
+            }, {
+                "key": "dashboard2",
+                "name": "仪表盘2"
+            }]
         """
-        self.update_config({
-            "enabled": self._enabled,
-            "notify": self._notify,
-            "onlyonce": self._onlyonce,
-            "cron": self._cron,
-            "days": self._days,
-            "users": self._users,
-            "clear": self._clear,
-            "search_download": self._search_download
-        })
+        pass
 
-    def delete_history(self, doubanid: str, apikey: str):
+    def get_module(self) -> Dict[str, Any]:
         """
-        删除同步历史记录
+        获取插件模块声明，用于胁持系统模块实现（方法名：方法实现）
+        {
+            "id1": self.xxx1,
+            "id2": self.xxx2,
+        }
         """
-        if apikey != settings.API_TOKEN:
-            return schemas.Response(success=False, message="API密钥错误")
-        # 历史记录
-        historys = self.get_data('history')
-        if not historys:
-            return schemas.Response(success=False, message="未找到历史记录")
-        # 删除指定记录
-        historys = [h for h in historys if h.get("doubanid") != doubanid]
-        self.save_data('history', historys)
-        return schemas.Response(success=True, message="删除成功")
+        pass
 
+    def get_actions(self) -> List[Dict[str, Any]]:
+        """
+        获取插件工作流动作
+        [{
+            "id": "动作ID",
+            "name": "动作名称",
+            "func": self.xxx,
+            "kwargs": {} # 需要附加传递的参数
+        }]
+
+        对实现函数的要求：
+        1、函数的第一个参数固定为 ActionContent 实例，如需要传递额外参数，在kwargs中定义
+        2、函数的返回：执行状态 True / False，更新后的 ActionContent 实例
+        """
+        pass
+
+    @abstractmethod
     def stop_service(self):
         """
-        退出插件
+        停止插件
         """
-        try:
-            if self._scheduler:
-                self._scheduler.remove_all_jobs()
-                if self._scheduler.running:
-                    self._scheduler.shutdown()
-                self._scheduler = None
-        except Exception as e:
-            logger.error("退出插件失败：%s" % str(e))
+        pass
 
-    @staticmethod
-    def __get_username_by_douban(user_id: str) -> Optional[str]:
+    def update_config(self, config: dict, plugin_id: Optional[str] = None) -> bool:
         """
-        根据豆瓣ID获取用户名
+        更新配置信息
+        :param config: 配置信息字典
+        :param plugin_id: 插件ID
         """
-        try:
-            return UserOper().get_name(douban_userid=user_id)
-        except Exception as err:
-            logger.warn(f'{err}, 需要 MoviePilot v2.2.6+ 版本')
-        return None
+        if not plugin_id:
+            plugin_id = self.__class__.__name__
+        return self.systemconfig.set(f"plugin.{plugin_id}", config)
 
-    def sync(self):
+    def get_config(self, plugin_id: Optional[str] = None) -> Any:
         """
-        通过用户RSS同步豆瓣想看数据
+        获取配置信息
+        :param plugin_id: 插件ID
         """
-        if not self._users:
-            return
-        # 版本
-        if hasattr(settings, 'VERSION_FLAG'):
-            version = settings.VERSION_FLAG  # V2
-        else:
-            version = "v1"
-        # 读取历史记录
-        if self._clearflag:
-            history = []
-        else:
-            history: List[dict] = self.get_data('history') or []
-        for user_id in self._users.split(","):
-            # 同步每个用户的豆瓣数据
-            if not user_id:
-                continue
-            logger.info(f"开始同步用户 {user_id} 的豆瓣想看数据 ...")
-            url = self._interests_url % user_id
-            if version == "v2":
-                results = RssHelper().parse(url, headers={
-                    "User-Agent": settings.USER_AGENT
-                })
-            else:
-                results = RssHelper().parse(url)
-            if not results:
-                logger.warn(f"未获取到用户 {user_id} 豆瓣RSS数据：{url}")
-                continue
-            else:
-                logger.info(f"获取到用户 {user_id} 豆瓣RSS数据：{len(results)}")
-            # 解析数据
-            mediachain = MediaChain()
-            downloadchain = DownloadChain()
-            subscribechain = SubscribeChain()
-            searchchain = SearchChain()
-            subscribeoper = SubscribeOper()
-            for result in results:
-                try:
-                    dtype = result.get("title", "")[:2]
-                    title = result.get("title", "")[2:]
-                    # 增加豆瓣昵称，数据来源自app.helper.rss.py
-                    nickname = result.get("nickname", "")
-                    if nickname:
-                        nickname = f"[{nickname}]"
-                    if dtype not in ["想看"]:
-                        logger.info(f'标题：{title}，非想看数据，跳过')
-                        continue
-                    if not result.get("link"):
-                        logger.warn(f'标题：{title}，未获取到链接，跳过')
-                        continue
-                    # 判断是否在天数范围
-                    pubdate: Optional[datetime.datetime] = result.get("pubdate")
-                    if pubdate:
-                        if (datetime.datetime.now(datetime.timezone.utc) - pubdate).days > float(self._days):
-                            logger.info(f'已超过同步天数，标题：{title}，发布时间：{pubdate}')
-                            continue
-                    douban_id = result.get("link", "").split("/")[-2]
-                    # 检查是否处理过
-                    if not douban_id or douban_id in [h.get("doubanid") for h in history]:
-                        logger.info(f'标题：{title}，豆瓣ID：{douban_id} 已处理过')
-                        continue
-                    # 识别媒体信息
-                    meta = MetaInfo(title=title)
-                    douban_info = self.chain.douban_info(doubanid=douban_id)
-                    meta.type = MediaType.MOVIE if douban_info.get("type") == "movie" else MediaType.TV
-                    if settings.RECOGNIZE_SOURCE == "themoviedb":
-                        tmdbinfo = mediachain.get_tmdbinfo_by_doubanid(doubanid=douban_id, mtype=meta.type)
-                        if not tmdbinfo:
-                            logger.warn(f'未能通过豆瓣ID {douban_id} 获取到TMDB信息，标题：{title}，豆瓣ID：{douban_id}')
-                            continue
-                        mediainfo = self.chain.recognize_media(meta=meta, tmdbid=tmdbinfo.get("id"))
-                        if not mediainfo:
-                            logger.warn(f'TMDBID {tmdbinfo.get("id")} 未识别到媒体信息')
-                            continue
-                    else:
-                        mediainfo = self.chain.recognize_media(meta=meta, doubanid=douban_id)
-                        if not mediainfo:
-                            logger.warn(f'豆瓣ID {douban_id} 未识别到媒体信息')
-                            continue
-                    # 查询缺失的媒体信息
-                    exist_flag, no_exists = downloadchain.get_no_exists_info(meta=meta, mediainfo=mediainfo)
-                    if exist_flag:
-                        logger.info(f'{mediainfo.title_year} 媒体库中已存在')
-                        action = "exist"
-                    else:
-                        # 用户转换
-                        real_name = self.__get_username_by_douban(user_id)
-                        if self._search_download:
-                            # 先搜索资源
-                            logger.info(
-                                f'媒体库中不存在或不完整，开启搜索下载，开始搜索 {mediainfo.title_year} 的资源...')
-                            # 按订阅优先级规则组搜索过滤，站点为设置的订阅站点
-                            filter_results = searchchain.process(
-                                mediainfo=mediainfo,
-                                no_exists=no_exists,
-                                sites=self.systemconfig.get(SystemConfigKey.RssSites),
-                                rule_groups=self.systemconfig.get(SystemConfigKey.SubscribeFilterRuleGroups)
-                            )
-                            if filter_results:
-                                logger.info(f'找到符合条件的资源，开始下载 {mediainfo.title_year} ...')
-                                action = "download"
-                                if mediainfo.type == MediaType.MOVIE:
-                                    # 电影类型调用单次下载
-                                    download_id = downloadchain.download_single(
-                                        context=filter_results[0],
-                                        username=real_name or f"豆瓣{nickname}想看"
-                                    )
-                                    if not download_id:
-                                        logger.info(f'下载失败，添加订阅 {mediainfo.title_year} ...')
-                                        self.add_subscribe(mediainfo, meta, nickname, real_name)
-                                        action = "subscribe"
-                                else:
-                                    # 电视剧类型调用批量下载
-                                    downloaded_list, no_exists = downloadchain.batch_download(
-                                        contexts=filter_results,
-                                        no_exists=no_exists,
-                                        username=real_name or f"豆瓣{nickname}想看"
-                                    )
-                                    if no_exists:
-                                        logger.info(f'下载失败或未下载完所有剧集，添加订阅 {mediainfo.title_year} ...')
-                                        sub_id, message = self.add_subscribe(mediainfo, meta, nickname, real_name)
-                                        action = "subscribe"
+        if not plugin_id:
+            plugin_id = self.__class__.__name__
+        return self.systemconfig.get(f"plugin.{plugin_id}")
 
-                                        # 更新订阅信息
-                                        logger.info(f'根据缺失剧集更新订阅信息 {mediainfo.title_year} ...')
-                                        subscribe = subscribeoper.get(sub_id)
-                                        if subscribe:
-                                            subscribechain.finish_subscribe_or_not(subscribe=subscribe,
-                                                                                   meta=meta,
-                                                                                   mediainfo=mediainfo,
-                                                                                   downloads=downloaded_list,
-                                                                                   lefts=no_exists)
-
-                            else:
-                                logger.info(f'未找到符合条件资源，添加订阅 {mediainfo.title_year} ...')
-                                self.add_subscribe(mediainfo, meta, nickname, real_name)
-                                action = "subscribe"
-                        else:
-                            logger.info(f'媒体库中不存在或不完整，未开启搜索下载，添加订阅 {mediainfo.title_year} ...')
-                            self.add_subscribe(mediainfo, meta, nickname, real_name)
-                            action = "subscribe"
-                    # 存储历史记录
-                    history.append({
-                        "action": action,
-                        "title": title,
-                        "type": mediainfo.type.value,
-                        "year": mediainfo.year,
-                        "poster": mediainfo.get_poster_image(),
-                        "overview": mediainfo.overview,
-                        "tmdbid": mediainfo.tmdb_id,
-                        "doubanid": douban_id,
-                        "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    })
-                except Exception as err:
-                    logger.error(f'同步用户 {user_id} 豆瓣想看数据出错：{str(err)}')
-            logger.info(f"用户 {user_id} 豆瓣想看同步完成")
-        # 保存历史记录
-        self.save_data('history', history)
-        # 缓存只清理一次
-        self._clearflag = False
-
-    @staticmethod
-    def add_subscribe(mediainfo, meta, nickname, real_name):
-        return SubscribeChain().add(
-            title=mediainfo.title,
-            year=mediainfo.year,
-            mtype=mediainfo.type,
-            tmdbid=mediainfo.tmdb_id,
-            season=meta.begin_season,
-            exist_ok=True,
-            username=real_name or f"豆瓣{nickname}想看"
-        )
-
-    @eventmanager.register(EventType.PluginAction)
-    def remote_sync(self, event: Event):
+    def get_data_path(self, plugin_id: Optional[str] = None) -> Path:
         """
-        豆瓣想看同步
+        获取插件数据保存目录
         """
-        if event:
-            event_data = event.event_data
-            if not event_data or event_data.get("action") != "douban_sync":
-                return
+        if not plugin_id:
+            plugin_id = self.__class__.__name__
+        data_path = settings.PLUGIN_DATA_PATH / f"{plugin_id}"
+        if not data_path.exists():
+            data_path.mkdir(parents=True)
+        return data_path
 
-            logger.info("收到命令，开始执行豆瓣想看同步 ...")
-            self.post_message(channel=event.event_data.get("channel"),
-                              title="开始同步豆瓣想看 ...",
-                              userid=event.event_data.get("user"))
-        self.sync()
+    def save_data(self, key: str, value: Any, plugin_id: Optional[str] = None):
+        """
+        保存插件数据
+        :param key: 数据key
+        :param value: 数据值
+        :param plugin_id: 插件ID
+        """
+        if not plugin_id:
+            plugin_id = self.__class__.__name__
+        self.plugindata.save(plugin_id, key, value)
 
-        if event:
-            self.post_message(channel=event.event_data.get("channel"),
-                              title="同步豆瓣想看数据完成！", userid=event.event_data.get("user"))
+    def get_data(self, key: Optional[str] = None, plugin_id: Optional[str] = None) -> Any:
+        """
+        获取插件数据
+        :param key: 数据key
+        :param plugin_id: plugin_id
+        """
+        if not plugin_id:
+            plugin_id = self.__class__.__name__
+        return self.plugindata.get_data(plugin_id, key)
+
+    def del_data(self, key: str, plugin_id: Optional[str] = None) -> Any:
+        """
+        删除插件数据
+        :param key: 数据key
+        :param plugin_id: plugin_id
+        """
+        if not plugin_id:
+            plugin_id = self.__class__.__name__
+        return self.plugindata.del_data(plugin_id, key)
+
+    def post_message(self, channel: MessageChannel = None, mtype: NotificationType = None, title: Optional[str] = None,
+                     text: Optional[str] = None, image: Optional[str] = None, link: Optional[str] = None,
+                     userid: Optional[str] = None, username: Optional[str] = None,
+                     **kwargs):
+        """
+        发送消息
+        """
+        if not link:
+            link = settings.MP_DOMAIN(f"#/plugins?tab=installed&id={self.__class__.__name__}")
+        self.chain.post_message(Notification(
+            channel=channel, mtype=mtype, title=title, text=text,
+            image=image, link=link, userid=userid, username=username, **kwargs
+        ))
+
+    def close(self):
+        pass
