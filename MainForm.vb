@@ -496,11 +496,10 @@ Public Class MainForm
                 "'," & tempDataSet_RM.Tables(0).Rows(ListBox1.SelectedIndex).Item("YEAR") &
                 ",'电影'," & tempDataSet_RM.Tables(0).Rows(ListBox1.SelectedIndex).Item("TMDBID") &
                 ",0,'" & tempDataSet_RM.Tables(0).Rows(ListBox1.SelectedIndex).Item("IMAGE") &
-                "','','','','','','" & Format(Now, "yyyy-MM-dd HH:mm:ss") & "')"
-            'Dim k As Boolean = Rss_Arr.Contains(tempDataSet_RM.Tables(0).Rows(ListBox1.SelectedIndex).Item("TMDBID").ToString)
-            'Dim kk As String = SQLDataBaseExecute(SQLstr, DataBaseConnection)
-            'k = kk
-            If DownLoad_Arr.Contains(tempDataSet_RM.Tables(0).Rows(ListBox1.SelectedIndex).Item("TMDBID").ToString) OrElse SQLDataBaseExecute(SQLstr, DataBaseConnection) = "" Then
+                "','','','','','','" & Format(Now, "yyyy-MM-dd HH:mm:ss") & "','','','','')"
+            Dim ContainRes As Boolean = Rss_Arr.Contains(tempDataSet_RM.Tables(0).Rows(ListBox1.SelectedIndex).Item("TMDBID").ToString)
+            Dim SQLExStr As String = SQLDataBaseExecute(SQLstr, DataBaseConnection)
+            If ContainRes OrElse SQLDataBaseExecute(SQLstr, DataBaseConnection) = "" Then
                 SQLDataBaseExecute("DELETE FROM RSS_MOVIES WHERE TMDBID = " & tempDataSet_RM.Tables(0).Rows(ListBox1.SelectedIndex).Item("TMDBID"), DataBaseConnection)
                 FreshList()
             End If
